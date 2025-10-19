@@ -21,29 +21,59 @@ def E(d, R):
 
 #W (R) for the Bragg peaks such that the superposition results in a flat SOBP of height D0 within an interval [da , db] 
 def W(R, d0, da, db):
-    t1 = p * np.sin(np.pi / p) * ap 
-    t2 = np.pi * (db - R)**(1/p)
-    return np.piecewise(R, [R < da or R > db, da <= R < db], [0, lambda R: d0 * (t1/t2)])
+    return np.piecewise(R,[(da<=R) & (R<db)],[lambda R: d0*p*np.sin(np.pi/p)*ap/(np.pi*(db-R)**(1.0/p)), 0])
 
 def D_SOBD(d, d0, da, db):
+    return np.piecewise(d, [(0<=d)&(d<da), (da<=d)&(d<=db)], [lambda d: _D_SOBD_Fun(d, d0, da, db), d0, 0])
+
+def _D_SOBD_Fun(d, d0, da, db):
     r = (da - d)/(db - da)
     rhat = r**(1/3)
-    bp = lambda d: d0*(0.75+np.sqrt(3)/(4*np.pi)*np.log((1+rhat)**2/(1-rhat+rhat**2))-3.0/(2.0*np.pi)*np.arctan((2*rhat-1)/np.sqrt(3))) 
-    return np.piecewise(d, [(0<=d)and(d<da), (da<=d)and(d<=db)], [bp, d0, 0])
+    return d0*(0.75+np.sqrt(3)/(4*np.pi)*np.log((1+rhat)**2/(1-rhat+rhat**2))-3.0/(2.0*np.pi)*np.arctan((2*rhat-1)/np.sqrt(3))) 
+    
 
-da = 10
-db = 15 
-d0 = 1 
+def add_legend():
+    plt.grid(True, alpha=0.3)
+    plt.grid('on')
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.legend(handles, labels, loc = 'best')
 
+def set_lim():
+    min, max = plt.gca().get_ylim()
+    plt.gca().set_ylim(min, max)
 
-r = R(100) # Mev 
-z = np.linspace(0, 25, 500)
-plt.figure(figsize=(9,5))
+def Plot_Proton_SOBP(da, db, d0):
 
-plt.xlabel("Depth in water (cm)")
-plt.ylabel("Relative dose (%)")
-plt.title("Approximate PDD Curves for Different Photon Beam Energies")
-plt.grid(True, alpha=0.3)
-plt.ylim(0, 110)
-plt.xlim(0, 25)
-plt.legend()
+    de = np.linspace(0, 25, 500)
+    plt.figure(figsize=(9,5))
+
+    bx = DBP(db - de)
+    bx /= bx[0] 
+    bx *= 10
+    plt.plot(de, bx, 'r', label='Exact')
+    plt.title("Bragg peak")
+    plt.xlabel('$d$ (cm)')
+    plt.ylabel("Relative Dose (%)")
+    set_lim()
+    add_legend()
+
+    plt.figure(figsize=(9,5))
+    wx = W(de, d0, da, db) 
+    plt.plot(de, wx, 'b', label='Weighting')
+    plt.xlabel('$R$ (cm)')
+    plt.ylabel(r'$W\left(R\right)$')
+    plt.title('Weighting function')
+    set_lim()
+    add_legend()
+
+    plt.figure(figsize=(9,5))
+    sx = D_SOBD(de, d0, da, db)
+    sx *= 100
+    plt.plot(de, sx, 'g', label='Exact')
+    plt.xlabel('$d$ (cm)')
+    plt.ylabel('Relative Dose (%)')
+    plt.title('(SOBP) Spread-out Bragg peak')
+    set_lim()
+    add_legend()
+    
+    return de, bx, wx, sx

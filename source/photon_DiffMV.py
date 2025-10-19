@@ -18,7 +18,6 @@ class PhotonEnergy(Enum):
     # If used, this should go alone 
     MVALL = 0
 
-
 # Beam parameters (MV : [a, b])
 PhotonsEnergiesParameters = {
     PhotonEnergy.MV2:  [3.40, 0.08],
@@ -41,22 +40,27 @@ def Plot_SinglePhotonBeam(z, energy):
     a, b = PhotonsEnergiesParameters[energy]
     D, D_norm, dMax = _Photon_ExpFunc(a, b, z)
     plt.plot(z, D_norm, label=f"{energy.value} MV (a={a:.2f}, b={b:.3f}) dmax={z[dMax]:.2f}cm")
+    return D_norm
 
 # Plots all photon beams of the requested energies
 def Plot_PhotonBeam(energies : tuple[PhotonEnergy]):
 
     z = np.linspace(0, 25, 500)  # depth in cm
     plt.figure(figsize=(9,5))
+    
+    
+
+    en = []
 
     if energies[0] == PhotonEnergy.MVALL:
         for MV, _ in PhotonsEnergiesParameters.items():
-            Plot_SinglePhotonBeam(z, MV)
+            en.append(Plot_SinglePhotonBeam(z, MV))
     else:
         for energy in energies:
             if energy not in PhotonsEnergiesParameters:
                 print(f"Photon Beam energy of {energy.value}MV not supported!")
                 continue 
-            Plot_SinglePhotonBeam(z, energy)
+            en.append(Plot_SinglePhotonBeam(z, energy))
 
     plt.xlabel("Depth in water (cm)")
     plt.ylabel("Relative dose (%)")
@@ -65,3 +69,4 @@ def Plot_PhotonBeam(energies : tuple[PhotonEnergy]):
     plt.ylim(0, 110)
     plt.xlim(0, 25)
     plt.legend()
+    return z, en
