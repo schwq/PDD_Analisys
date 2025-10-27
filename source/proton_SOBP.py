@@ -65,39 +65,53 @@ def set_lim():
     min, max = plt.gca().get_ylim()
     plt.gca().set_ylim(min, max)
 
-
-def Plot_Proton_SOBP(da, db, d0):
-
+def get_proton_SOBP_data(da, db, d0):
     de = np.linspace(0, 25, 500)
-    plt.figure(figsize=(9, 5))
-
+    
     bx = DBP(db - de)
     bx /= bx[0]
     bx *= 10
-    plt.plot(de, bx, "r", label="Exact")
-    plt.title("Bragg peak")
-    plt.xlabel("$d$ (cm)")
-    plt.ylabel("Relative Dose (%)")
-    set_lim()
-    add_legend()
-
-    plt.figure(figsize=(9, 5))
+    
     wx = W(de, d0, da, db)
-    plt.plot(de, wx, "b", label="Weighting")
-    plt.xlabel("$R$ (cm)")
-    plt.ylabel(r"$W\left(R\right)$")
-    plt.title("Weighting function")
-    set_lim()
-    add_legend()
-
-    plt.figure(figsize=(9, 5))
+    
     sx = D_SOBD(de, d0, da, db)
     sx *= 100
-    plt.plot(de, sx, "g", label="Exact")
-    plt.xlabel("$d$ (cm)")
-    plt.ylabel("Relative Dose (%)")
-    plt.title("(SOBP) Spread-out Bragg peak")
-    set_lim()
-    add_legend()
-
+    
     return de, bx, wx, sx
+    
+def Plot_Proton_SOBP(da, db, d0):
+
+    de = np.linspace(0, 25, 500)
+    #plt.figure(figsize=(9, 5))
+
+    #bx = DBP(db - de)
+    #bx /= bx[0]
+    #bx *= 10
+    #plt.plot(de, bx, "r", label="Exact")
+    #plt.title("Bragg peak")
+    #plt.xlabel("$d$ (cm)")
+    #plt.ylabel("Relative Dose (%)")
+    #set_lim()
+    #add_legend()
+
+    #plt.figure(figsize=(9, 5))
+    #wx = W(de, d0, da, db)
+    #plt.plot(de, wx, "b", label="Weighting")
+    #plt.xlabel("$R$ (cm)")
+    #plt.ylabel(r"$W\left(R\right)$")
+    #plt.title("Weighting function")
+    #set_lim()
+    #add_legend()
+
+    #plt.figure(figsize=(9, 5))
+    sx = D_SOBD(de, d0, da, db)
+    sx *= 100
+    #plt.plot(de, sx, "g", label="Exact")
+    #plt.xlabel("$d$ (cm)")
+    #plt.ylabel("Relative Dose (%)")
+    #plt.title("(SOBP) Spread-out Bragg peak")
+    #set_lim()
+    #add_legend()
+
+    #return de, bx, wx, sx
+    return de, 0, 0, sx

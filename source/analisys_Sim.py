@@ -1,10 +1,10 @@
-from proton_SOBP import Plot_Proton_SOBP
+from proton_SOBP import Plot_Proton_SOBP, get_proton_SOBP_data
 from photon_DiffMV import PhotonEnergy, Plot_PhotonBeam
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.ndimage import gaussian_filter
-from photon_DiffMV import _Photon_ExpFunc
+from photon_DiffMV import EMPDDMV_PhotonBeam, PhotonsEnergiesParameters
 from skimage.transform import resize
 import matplotlib.image as mpimg
 from skimage import io, color, filters, measure, morphology
@@ -92,10 +92,10 @@ def add_contour_levels(x, y ,z, start=10, end=101, step=10, color='white', linew
     contours = plt.contour(x, y, z, levels=levels, colors=color, linewidths=linewidth)
     plt.clabel(contours, inline=True, fontsize=fontsize, fmt='%d%%')
 
-def info_mean_values(total_dose, tumor_mask, not_tumor_mask):
+def info_mean_values(total_dose, tumor_mask, image):
     mean_dose_tumor = np.mean(total_dose[tumor_mask]) 
     mean_dose_all = np.mean(total_dose)
-    mean_dose_not_tumor = np.mean(total_dose[not_tumor_mask])
+    mean_dose_not_tumor = np.mean(total_dose[image.mask & ~tumor_mask])
     print(f"Mean dose in tumor tissue = {mean_dose_tumor:.2f}%")
     print(f"Mean dose in all tissue = {mean_dose_all:.2f}%")
     print(f"Mean dose in not tumor tissue = {mean_dose_not_tumor:.2f}%")
@@ -140,9 +140,9 @@ def create_tumor_mask(X, Y, tx=0, ty=0, radius=3):
     return tumor_mask, not_tumor_mask
 
 def get_photon_data(X, size, grid_size):
-    a, b = 2.2, 0.06  
+    n, u = PhotonsEnergiesParameters[PhotonEnergy.MV6]
     z = np.linspace(0, size, grid_size)
-    D, D_norm, _ = _Photon_ExpFunc(a, b, z)
+    D, D_norm, _ = EMPDDMV_PhotonBeam(z, n, u)
     total_dose = np.zeros_like(X)
     return z, D, D_norm, total_dose
 
@@ -206,8 +206,9 @@ def add_beams(num_beams, angles, X, Y, tx, ty, z, D_norm, beam_width, size, tota
 def apply_mask(image : Image, total_dose):
     if image.mask is not None:
         mask_resized = resize(image.mask.astype(float), total_dose.shape, mode='reflect', anti_aliasing=False) > 0.5
+        image.mask = mask_resized
         total_dose = total_dose * mask_resized  # zero dose outside mask
-    return total_dose
+    return total_dose, image
 
 def adjust_total_dose(total_dose):
     total_dose = gaussian_filter(total_dose, sigma=10)
@@ -239,11 +240,11 @@ def simulate_photon_beams_2d(grid_size=300, tumor_radius=3, num_beams=4, beam_wi
 
     total_dose = add_beams(num_beams, angles, X, Y, tx, ty, z, D_norm, beam_width, size, total_dose, image)
 
-    total_dose = apply_mask(image, total_dose)
+    total_dose, image = apply_mask(image, total_dose)
 
     total_dose = adjust_total_dose(total_dose)
 
-    info_mean_values(total_dose, tumor_mask, not_tumor_mask)
+    info_mean_values(total_dose, tumor_mask, image)
     
     plt.figure(figsize=(9, 9))
     
@@ -257,7 +258,7 @@ def simulate_photon_beams_2d(grid_size=300, tumor_radius=3, num_beams=4, beam_wi
     
 
 def get_proton_data(da, db, d0, X):
-    depth, _, _, dose_profile = Plot_Proton_SOBP(da, db, d0)
+    depth, _, _, dose_profile = get_proton_SOBP_data(da, db, d0)
     dose_profile /= dose_profile.max()  
     total_dose = np.zeros_like(X)
     return total_dose, dose_profile, depth
@@ -273,11 +274,11 @@ def simulate_proton_beams_2d(grid_size=400, tumor_radius=3, num_beams=4, beam_wi
 
     total_dose = add_beams(num_beams, angles, X, Y, tx, ty, depth, dose_profile, beam_width, size, total_dose, image)    
     
-    total_dose = apply_mask(image, total_dose)
+    total_dose, image = apply_mask(image, total_dose)
     
     total_dose = adjust_total_dose(total_dose)
 
-    info_mean_values(total_dose, tumor_mask, not_tumor_mask)
+    info_mean_values(total_dose, tumor_mask, image)
     
     plt.figure(figsize=(9, 9))
     
@@ -299,11 +300,11 @@ def _op_proton_beam_2d(grid_size=400, tumor_radius=3, num_beams=4, beam_width=2,
 
     total_dose = add_beams(num_beams, angles, X, Y, tx, ty, depth, dose_profile, beam_width, size, total_dose, image)    
     
-    total_dose = apply_mask(image, total_dose)
+    total_dose, image = apply_mask(image, total_dose)
     
     total_dose = adjust_total_dose(total_dose)
 
-    return total_dose
+    return total_dose, tumor_mask, image
 
 def _op_photon_beam_2d(grid_size=300, tumor_radius=3, num_beams=4, beam_width=4, angles=[], image=None, tx=0, ty=0):
     
@@ -315,14 +316,31 @@ def _op_photon_beam_2d(grid_size=300, tumor_radius=3, num_beams=4, beam_width=4,
 
     total_dose = add_beams(num_beams, angles, X, Y, tx, ty, z, D_norm, beam_width, size, total_dose, image)
 
-    total_dose = apply_mask(image, total_dose)
+    total_dose, image = apply_mask(image, total_dose)
 
     total_dose = adjust_total_dose(total_dose)
 
-    return total_dose
+    return total_dose, tumor_mask, image
+"""
+def score_beam(image, num_beams, angles, beam_width, da, db,
+                penalty, grid_size, tumor_radius, cx, cy):
+    total_dose_photon, tumor_mask_photon,  image = _op_photon_beam_2d(grid_size=grid_size, tumor_radius=tumor_radius, num_beams=num_beams, beam_width=beam_width, angles=angles, image=image, tx=cx, ty=cy)
+    total_dose_proton, tumor_mask_proton,  image = _op_proton_beam_2d(grid_size=grid_size, da=da, db=db, d0=1, tumor_radius=tumor_radius, num_beams=num_beams, beam_width=beam_width, angles=angles, image=image, tx=cx, ty=cy)
+
+    not_tumor_mask =  image.mask & ~tumor_mask_proton
+
+    mean_tumor_photon = np.mean(total_dose_photon[tumor_mask_photon])
+    mean_not_tumor_photon = np.mean(total_dose_photon[not_tumor_mask])
+
+    mean_tumor_proton = np.mean(total_dose_proton[tumor_mask_proton])
+    mean_not_tumor_proton = np.mean(total_dose_proton[not_tumor_mask])
+
+    score_photon = mean_tumor_photon - penalty * mean_not_tumor_photon
+    score_proton = mean_tumor_proton - penalty * mean_not_tumor_proton
+    return score_photon, score_proton
 
 
-def optimize_beams(image, tumor_mask, not_tumor_mask, generations=1000, population_size=15, penalty=1.0):
+def optimize_beams(image,grid_size, tumor_radius, cx, cy, generations=200, population_size=10, penalty=1.0):
     best_photon = -np.inf
     best_params_photon = None
     best_proton = -np.inf
@@ -336,9 +354,9 @@ def optimize_beams(image, tumor_mask, not_tumor_mask, generations=1000, populati
             da = np.random.uniform(0.0, 20.0)
             db = np.random.uniform(da, 25.0)
             angles = sorted(random.sample(range(0, 180, 5), num_beams))
-            photon_score, proton_score = score_beam(image, tumor_mask, not_tumor_mask,
-                num_beams, angles, beam_width, da, db,
-                penalty=penalty)
+            photon_score, proton_score = score_beam(image,
+                num_beams, angles, beam_width, da, db, 
+                penalty, grid_size, tumor_radius, cx, cy)
             if proton_score > best_proton:
                 best_proton = proton_score
                 best_params_proton = dict(num_beams=num_beams, beam_width=beam_width, da=da, db=db, angles=angles, score=proton_score)
@@ -347,13 +365,19 @@ def optimize_beams(image, tumor_mask, not_tumor_mask, generations=1000, populati
                 best_params_photon = dict(num_beams=num_beams, beam_width=beam_width, angles=angles, score=photon_score)
     
     return best_params_photon, best_params_proton
-
-
+"""
 
 def start():
+    
     cx, cy, radius = select_cancer_region("./assets/medulloblastoma.jpg", size=20)
     image = create_mri_image("./assets/medulloblastoma.jpg",alpha=1)
     image = apply_red_mask(image, "./assets/mask.png")
-    simulate_photon_beams_2d(grid_size=400, tumor_radius=radius, num_beams=4, beam_width=2.5, angles=[0, 10, 20, 30], image=image, tx=cx, ty=cy)
-    simulate_proton_beams_2d(grid_size=400, tumor_radius=radius, num_beams=4, beam_width=2.5, angles=[0, 10, 20, 30], image=image, tx=cx, ty=cy)
+    #best_photon, best_proton = optimize_beams(image, 400, radius, cx, cy)
+ 
+    #simulate_photon_beams_2d(grid_size=400, tumor_radius=radius, num_beams=best_photon["num_beams"], beam_width=best_photon["beam_width"], angles=best_photon["angles"], image=image, tx=cx, ty=cy)
+    #simulate_proton_beams_2d(grid_size=400, tumor_radius=radius, num_beams=best_proton["num_beams"], beam_width=best_proton["beam_width"], angles=best_proton["angles"], da=best_proton["da"], db=best_proton["db"], image=image, tx=cx, ty=cy)
+    
+    simulate_photon_beams_2d(grid_size=400, tumor_radius=radius, num_beams=10, beam_width=2, angles=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90], image=image, tx=cx, ty=cy)
+    simulate_proton_beams_2d(grid_size=400, tumor_radius=radius, num_beams=8, beam_width=2, angles=[0, 5, 10, 15, 20, 25, 30, 35], da=3, db=7, image=image, tx=cx, ty=cy)
+    
     plt.show()
