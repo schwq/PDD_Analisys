@@ -1,2 +1,3 @@
-import analisys_Sim as Sim 
-Sim.Simulation.start()
+import analisys_Sim as Analysis
+
+Analysis.start()
