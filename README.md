@@ -73,7 +73,7 @@ To control the simulation values ​​and information, change the values ​​
 }
 ```
 
-To use an image, you must have a red mask marking where the fabric is; an example follows along with the simulation. Take a look at assets/. The demarcation doesn't need to be very precise, as it's just an approximation; you should also include the tumor area. When you start running the program, a window with your image will appear, and you should click on the center of the tumor, then click on one of its edges. This program treats the tumor as a circle. If everything goes well, the result of your simulation will appear. 
+To use an image, you must have a red mask marking where the tissue is; an example follows along with the simulation. Take a look at assets/mask.png and assets/medulloblastoma.jpg. The demarcation doesn't need to be very precise, as it's just an approximation; you should also include the tumor area. When you start running the program, a window with your image will appear, and you should click on the center of the tumor, then click on one of its edges. This program treats the tumor as a circle. If everything goes well, the result of your simulation will appear. 
 
 To read the full article about this simulation and the physics behind it you can access it: _https://docs.google.com/document/d/1x5jwftjvVpo8W9oqW-vHxnjcJ8dBCnEwKQQBfREUoeg/edit?usp=sharing_
 
