@@ -1,0 +1,47 @@
+{
+    "Photon": {
+        "PlotEnergies": [
+            6,
+            18
+        ],
+        "NumBeams": 10,
+        "BeamWidth": 2,
+        "PhotonEnergyPlot": 6,
+        "Angles": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80,
+            90
+        ]
+    },
+    "Proton": {
+        "Da": 3,
+        "Db": 7,
+        "D0": 1,
+        "NumBeams": 8,
+        "BeamWidth": 2,
+        "Angles": [
+            0,
+            5,
+            10,
+            15,
+            20,
+            25,
+            30,
+            35
+        ]
+    },
+    "Simulation": {
+        "ImagePath": "./assets/medulloblastoma.jpg",
+        "MaskPath": "./assets/mask.png",
+        "ImageAlpha": 1,
+        "GridSize": 400,
+        "ImageSize": 20
+    }
+}
