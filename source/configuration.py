@@ -1,5 +1,5 @@
 import json
-from photon_DiffMV import PhotonEnergy
+from photon import PhotonEnergy
 
 class PhotonConfiguration:
     
@@ -40,17 +40,17 @@ class ProgramConfiguration:
         with open(path, 'r') as file: data = json.load(file)
         self.photon = PhotonConfiguration([], 0, 0, [], PhotonEnergy.MV6)
         self.photon.energies = [ _get_member_enum_from_value(PhotonEnergy, int(n)) for n in data['Photon']['PlotEnergies']]        
-        self.photon.numBeams = int(data['Photon']['NumBeams'])
+        self.photon.angles = [float(n) for n in data['Photon']['Angles']]
+        self.photon.numBeams = len(self.photon.angles)
         self.photon.beamWidth = float(data['Photon']['BeamWidth'])
         self.photon.photonEnergy = _get_member_enum_from_value(PhotonEnergy, int(data['Photon']['PhotonEnergyPlot']))
-        self.photon.angles = [float(n) for n in data['Photon']['Angles']]
         self.proton = ProtonConfiguration(0, 0, 0, 0, 0, [])
         self.proton.da = float(data['Proton']['Da'])
         self.proton.db = float(data['Proton']['Db'])
         self.proton.d0 = float(data['Proton']['D0'])
-        self.proton.numBeams = int(data['Proton']['NumBeams'])
-        self.proton.beamWidth = float(data['Proton']['BeamWidth'])
         self.proton.angles = [float(n) for n in data['Proton']['Angles']]
+        self.proton.numBeams = len(self.proton.angles)
+        self.proton.beamWidth = float(data['Proton']['BeamWidth'])
         self.sim = SimulationConfiguration("", "", 0, 0, 0)
         self.sim.image = data['Simulation']['ImagePath']
         self.sim.mask = data['Simulation']['MaskPath']

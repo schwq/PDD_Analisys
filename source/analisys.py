@@ -1,5 +1,5 @@
-from proton_SOBP import get_proton_SOBP_data
-from photon_DiffMV import Plot_PhotonBeam, EMPDDMV_PhotonBeam, PhotonsEnergiesParameters
+from proton import plt_photon_SOBP
+from photon import plt_photons, empddmv_photon, PhotonsEnergiesParameters
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
@@ -15,11 +15,8 @@ class Image:
 
 def select_cancer_region(image_path, size):
 
-    img = mpimg.imread(image_path)
-    if img.ndim == 3:
-        img_gray = np.mean(img, axis=2)
-    else:
-        img_gray = img
+    img = _open_file(image_path)
+    img_gray = _convert_to_grayscale(img)
 
     fig, ax = plt.subplots(figsize=(9, 9))
     img_gray = np.rot90(img_gray, 2)
@@ -38,7 +35,6 @@ def select_cancer_region(image_path, size):
             ax.plot(event.xdata, event.ydata, 'ro')
             fig.canvas.draw()
         elif len(pts) == 1:
-            # Second click defines border
             pts.append((event.xdata, event.ydata))
             if circle_artist[0]:
                 circle_artist[0].remove()
@@ -70,6 +66,9 @@ def select_cancer_region(image_path, size):
     if len(pts) < 2:
         print("Canceled or incomplete selection.")
         return None, None, None
+    
+    fig.canvas.mpl_disconnect('button_press_event')
+    fig.canvas.mpl_disconnect('motion_notify_event')
 
     cx, cy = pts[0]
     bx, by = pts[1]
@@ -82,13 +81,13 @@ def add_contour_levels(x, y ,z, start=10, end=101, step=10, color='white', linew
     contours = plt.contour(x, y, z, levels=levels, colors=color, linewidths=linewidth)
     plt.clabel(contours, inline=True, fontsize=fontsize, fmt='%d%%')
 
-def info_mean_values(total_dose, tumor_mask, image):
+def info_mean_values(particle, total_dose, tumor_mask, image):
     mean_dose_tumor = np.mean(total_dose[tumor_mask]) 
-    mean_dose_all = np.mean(total_dose)
+    mean_dose_all = np.mean(total_dose[image.mask])
     mean_dose_not_tumor = np.mean(total_dose[image.mask & ~tumor_mask])
-    print(f"Mean dose in tumor tissue = {mean_dose_tumor:.2f}%")
-    print(f"Mean dose in all tissue = {mean_dose_all:.2f}%")
-    print(f"Mean dose in not tumor tissue = {mean_dose_not_tumor:.2f}%")
+    print(f"{particle} mean dose in tumor tissue = {mean_dose_tumor:.2f}%")
+    print(f"{particle} mean dose in all tissue = {mean_dose_all:.2f}%")
+    print(f"{particle} mean dose in not tumor tissue = {mean_dose_not_tumor:.2f}%")
 
 def add_contour_tumor(x, y, tx, ty, tumor_mask, radius, color='cyan', linewidth=2):
     plt.contour(x, y, tumor_mask, colors=color, linewidths=linewidth)
@@ -137,31 +136,22 @@ def create_tumor_mask(X, Y, tx=0, ty=0, radius=3):
 def get_photon_data(X, size, grid_size):
     n, u = PhotonsEnergiesParameters[conf.photon.photonEnergy]
     z = np.linspace(0, size, grid_size)
-    D, D_norm, _ = EMPDDMV_PhotonBeam(z, n, u)
+    D, D_norm, _ = empddmv_photon(z, n, u)
     total_dose = np.zeros_like(X)
     return z, D, D_norm, total_dose
 
 def compute_tissue_depth(Xr, Yr, mask, size, grid_size):
-    """
-    Compute effective tissue depth along the beam direction
-    (accumulated only inside tissue regions).
-    """
+    
     tissue_depth = np.zeros_like(Xr)
 
-    # Rescale mask to match beam grid
     mask_resized = resize(mask.astype(float), Xr.shape, mode='reflect', anti_aliasing=False) > 0.5
     
-    # Sort coordinates along the beam axis (Yr direction)
-    # We assume Yr increases in beam propagation direction
     sort_idx = np.argsort(Yr, axis=0)
-    Yr_sorted = np.take_along_axis(Yr, sort_idx, axis=0)
     mask_sorted = np.take_along_axis(mask_resized, sort_idx, axis=0)
     
-    # Increment depth only inside tissue
     dy = size / grid_size
     depth_sorted = np.cumsum(mask_sorted * dy, axis=0)
     
-    # Unsort back to original order
     tissue_depth = np.take_along_axis(depth_sorted, np.argsort(sort_idx, axis=0), axis=0)
     
     return tissue_depth
@@ -171,38 +161,34 @@ def add_beams(num_beams, angles, X, Y, tx, ty, z, D_norm, beam_width, size, tota
     
     for i in range(num_beams):
         
-        # Beam rotation
         angle = angles[i]
         theta = np.deg2rad(angle)
         
         xs = X - tx 
         ys = Y - ty
         
-        # Rotate coordinates for beam direction
         Xr = xs *np.cos(theta) -  ys *np.sin(theta)
         Yr = xs *np.sin(theta) + ys *np.cos(theta)
         
         if hasattr(image, "mask") and image.mask is not None:
-            # Compute tissue depth (only inside head)
             tissue_depth = compute_tissue_depth(Xr, Yr, image.mask, size, X.shape[0])
             depth = np.clip(tissue_depth, 0, size)
         else:
-            # fallback if no mask
             depth = np.clip(Yr + size/2, 0, size)
 
         dose_depth = np.interp(depth, z, D_norm)
 
-        # Apply Gaussian lateral falloff (beam width control)
         lateral_profile = np.exp(-(Xr**2) / (2 * (beam_width/2)**2))
         beam_dose = dose_depth * lateral_profile
         total_dose += beam_dose
+
     return total_dose
 
 def apply_mask(image : Image, total_dose):
     if image.mask is not None:
         mask_resized = resize(image.mask.astype(float), total_dose.shape, mode='reflect', anti_aliasing=False) > 0.5
         image.mask = mask_resized
-        total_dose = total_dose * mask_resized  # zero dose outside mask
+        total_dose = total_dose * mask_resized  
     return total_dose, image
 
 def adjust_total_dose(total_dose):
@@ -211,7 +197,6 @@ def adjust_total_dose(total_dose):
     return total_dose
     
 def show_image_mri(image : Image, total_dose, size):
-    print(f"Total dose shape is {total_dose.shape}")
     if image is not None:
         mri_resized = resize(image.data, total_dose.shape, mode='reflect', anti_aliasing=True)
         plt.imshow(mri_resized, cmap='gray', extent=[-size/2, size/2, -size/2, size/2], alpha=image.alpha)
@@ -239,7 +224,7 @@ def simulate_photon_beams_2d(grid_size=300, tumor_radius=3, num_beams=4, beam_wi
 
     total_dose = adjust_total_dose(total_dose)
 
-    info_mean_values(total_dose, tumor_mask, image)
+    info_mean_values("Photon", total_dose, tumor_mask, image)
     
     plt.figure(figsize=(9, 9))
     
@@ -253,12 +238,11 @@ def simulate_photon_beams_2d(grid_size=300, tumor_radius=3, num_beams=4, beam_wi
     
 
 def get_proton_data(da, db, d0, X):
-    depth, _, _, dose_profile = get_proton_SOBP_data(da, db, d0)
+    depth, _, _, dose_profile = plt_photon_SOBP(da, db, d0)
     dose_profile /= dose_profile.max()  
     total_dose = np.zeros_like(X)
     return total_dose, dose_profile, depth
     
-
 def simulate_proton_beams_2d(grid_size=400, tumor_radius=3, num_beams=4, beam_width=2, da=3, db=6, d0=1, angles=[], image=None, tx=0, ty=0):
     
     x, y, X, Y, size = create_meshgrid(conf.sim.imageSize, grid_size)
@@ -273,7 +257,7 @@ def simulate_proton_beams_2d(grid_size=400, tumor_radius=3, num_beams=4, beam_wi
     
     total_dose = adjust_total_dose(total_dose)
 
-    info_mean_values(total_dose, tumor_mask, image)
+    info_mean_values("Proton", total_dose, tumor_mask, image)
     
     plt.figure(figsize=(9, 9))
     
@@ -291,11 +275,12 @@ def start():
     global conf 
     conf = ProgramConfiguration("./data/configuration.json") 
 
-    Plot_PhotonBeam(conf.photon.energies)
 
     cx, cy, radius = select_cancer_region(conf.sim.image, size=conf.sim.imageSize)
     image = create_mri_image(conf.sim.image,alpha=conf.sim.alpha)
     image = apply_red_mask(image, conf.sim.mask)
+    
+    plt_photons(conf.photon.energies)
     
     simulate_photon_beams_2d(grid_size=conf.sim.gridSize, tumor_radius=radius, num_beams=conf.photon.numBeams, beam_width=conf.photon.beamWidth, angles=conf.photon.angles, image=image, tx=cx, ty=cy)
     simulate_proton_beams_2d(grid_size=conf.sim.gridSize, tumor_radius=radius, num_beams=conf.proton.numBeams, beam_width=conf.proton.beamWidth, angles=conf.proton.angles, da=conf.proton.da, db=conf.proton.db, d0=conf.proton.d0, image=image, tx=cx, ty=cy)

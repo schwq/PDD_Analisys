@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from enum import Enum
 import json
 
+# Plus-Minus unicode 
 pm = '\u00B1'
 
 class PhotonEnergy(Enum):
@@ -27,6 +28,7 @@ PhotonsEnergiesParameters = {
     PhotonEnergy.MV18: [1.2, 0.0422],
 }
 
+# Get all stored data from real measures in photon therapy
 def read_measured_data(show_energies):
 
     measured_data = []
@@ -41,50 +43,51 @@ def read_measured_data(show_energies):
         beam = data[f"{key.value}mv"]
         depths = []
         doses = []
+        
         for val in beam:
             depth = val['d']
             dose = val['v']
             depths.append(depth)
             doses.append(dose)
+        
         measured_data.append((key, depths, doses))
+        
+        plt.plot(depths, doses, '+', label=f'Measured data {key.value}MV')
 
-
-    for energy, depths, doses in measured_data: plt.plot(depths, doses, '+', label=f'Measured data {energy.value}MV')
     return measured_data
 
-def Plot_SinglePhotonBeam(z, energy):
+# Plots a graph about a photon with given energy 
+def plt_single_photon(depth, energy):
     n, u = PhotonsEnergiesParameters[energy]
-    D, D_norm, dMax = EMPDDMV_PhotonBeam(z, n, u)
+    D, D_norm, dMax = empddmv_photon(depth, n, u)
     plt.plot(
-        z,
+        depth,
         D_norm,
-        label=f"{energy.value} MV (n={n:.2f}, u={u:.3f}) dmax={z[dMax]:.2f}cm",
+        label=f"{energy.value} MV (n={n:.2f}, u={u:.3f}) dmax={depth[dMax]:.2f}cm",
     )
     return (energy, D, D_norm)
 
-def EMPDDMV_PhotonBeam(depth, n, u):
+# Empirical modeling of the percent depth dose for megavoltage photon beams
+def empddmv_photon(depth, n, u):
     d = depth / np.sqrt((depth ** 2) + n) * np.exp(-u * depth)
     dnorm = d = 100 * d / np.max(d)
     dmax = np.argmax(d)
     return d, dnorm, dmax
 
-def compare_measured_vs_model(measured_data, theoretical_data, z):
+# Given the measured data and the theotical data, compare the error between them 
+def compare_measured_vs_model(measured_data, theoretical_data, depth):
     for energy, depths, doses_measured in measured_data:
         
         _, _, dnorm = next((d for d in theoretical_data if d[0] == energy), None)
-        doses_model_interp = np.interp(depths, z, dnorm)
+        doses_model_interp = np.interp(depths, depth, dnorm)
         doses_measured = np.array(doses_measured)
         diff = doses_measured - doses_model_interp
         mae = np.mean(np.abs(diff))
-        rmse = np.sqrt(np.mean(diff**2))
-        mean_diff = np.mean(diff)
 
-        print(f"  Mean absolute error: {pm}{mae:.2f}")
-        print(f"  Mean square error: {pm}{rmse:.2f}")
-        print(f"  Mean difference (measured - model): {pm}{np.abs(mean_diff):.2f}")
+        print(f"Photon Aproximation: Mean absolute error for {energy.value}MV: {pm}{mae:.2f}")
 
-
-def Plot_PhotonBeam(energies: tuple[PhotonEnergy]):
+#Plots all photon PDD graphs of the given energies, use MVALL alone for all energies
+def plt_photons(energies: tuple[PhotonEnergy]):
 
     depths = np.linspace(0, 25, 500) 
     plt.figure(figsize=(9, 5))
@@ -95,13 +98,13 @@ def Plot_PhotonBeam(energies: tuple[PhotonEnergy]):
 
     if energies[0] == PhotonEnergy.MVALL:
         for MV, _ in PhotonsEnergiesParameters.items():
-            theoretical_data.append(Plot_SinglePhotonBeam(depths, MV))
+            theoretical_data.append(plt_single_photon(depths, MV))
     else:
         for energy in energies:
             if energy not in PhotonsEnergiesParameters:
                 print(f"Photon Beam energy of {energy.value}MV not supported!")
                 continue
-            theoretical_data.append(Plot_SinglePhotonBeam(depths, energy))
+            theoretical_data.append(plt_single_photon(depths, energy))
 
     compare_measured_vs_model(measured_data, theoretical_data, depths)
 

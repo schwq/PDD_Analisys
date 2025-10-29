@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+# SOBD function solution was solved using 1.5 on Thomas Bortfeld and Wolfgang Schlegel (1996) 
 p = 1.5
-alpha = 1.9e-3
+alpha = 1.9e-3 
 
 ap = alpha ** (1 / p)
 dp = 1 - (1 / p)
@@ -10,17 +11,14 @@ dp = 1 - (1 / p)
 def DBP(d):
     return np.piecewise(d, [d <= 0, d > 0], [0, lambda d: 1 / (p * ap * d**dp)])
 
-
 # For protons with energies between 10 and 200 MeV one finds p ≈ 1.8 (Evans 1982, Raju 1980).
 def R(E0):
     if E0 < 10 or E0 > 200:
         print("Not supported energy ", E0)
     return alpha * (E0**p)
 
-
 def E(d, R):
     return ((R - d) / alpha) ** (1 / p)
-
 
 # W (R) for the Bragg peaks such that the superposition results in a flat SOBP of height D0 within an interval [da , db]
 def W(R, d0, da, db):
@@ -33,7 +31,7 @@ def W(R, d0, da, db):
         ],
     )
 
-
+# The SOBP depth–dose distribution. The shape of the SOBP curve can now be calculated by convolving DBP(d) with W (R).
 def D_SOBD(d, d0, da, db):
     return np.piecewise(
         d,
@@ -41,7 +39,7 @@ def D_SOBD(d, d0, da, db):
         [lambda d: _D_SOBD_Fun(d, d0, da, db), d0, 0],
     )
 
-
+# Wrapper around the SOBP function
 def _D_SOBD_Fun(d, d0, da, db):
     r = (da - d) / (db - da)
     rhat = r ** (1 / 3)
@@ -50,7 +48,6 @@ def _D_SOBD_Fun(d, d0, da, db):
         + np.sqrt(3) / (4 * np.pi) * np.log((1 + rhat) ** 2 / (1 - rhat + rhat**2))
         - 3.0 / (2.0 * np.pi) * np.arctan((2 * rhat - 1) / np.sqrt(3))
     )
-
 
 def add_legend():
     plt.grid(True, alpha=0.3)
@@ -63,6 +60,7 @@ def set_lim():
     min, max = plt.gca().get_ylim()
     plt.gca().set_ylim(min, max)
 
+# Dont plot information, just return data
 def get_proton_SOBP_data(da, db, d0):
     de = np.linspace(0, 25, 500)
     
@@ -77,15 +75,15 @@ def get_proton_SOBP_data(da, db, d0):
     
     return de, bx, wx, sx
     
-def Plot_Proton_SOBP(da, db, d0):
+def plt_photon_SOBP(da, db, d0):
 
-    de = np.linspace(0, 25, 500)
+    depths = np.linspace(0, 25, 500)
     plt.figure(figsize=(9, 5))
 
-    bx = DBP(db - de)
+    bx = DBP(db - depths)
     bx /= bx[0]
     bx *= 10
-    plt.plot(de, bx, "r", label="Exact")
+    plt.plot(depths, bx, "r", label="Exact")
     plt.title("Bragg peak")
     plt.xlabel("$d$ (cm)")
     plt.ylabel("Relative Dose (%)")
@@ -93,8 +91,8 @@ def Plot_Proton_SOBP(da, db, d0):
     add_legend()
 
     plt.figure(figsize=(9, 5))
-    wx = W(de, d0, da, db)
-    plt.plot(de, wx, "b", label="Weighting")
+    wx = W(depths, d0, da, db)
+    plt.plot(depths, wx, "b", label="Weighting")
     plt.xlabel("$R$ (cm)")
     plt.ylabel(r"$W\left(R\right)$")
     plt.title("Weighting function")
@@ -102,14 +100,14 @@ def Plot_Proton_SOBP(da, db, d0):
     add_legend()
 
     plt.figure(figsize=(9, 5))
-    sx = D_SOBD(de, d0, da, db)
+    sx = D_SOBD(depths, d0, da, db)
     sx *= 100
-    plt.plot(de, sx, "g", label="Exact")
+    plt.plot(depths, sx, "g", label="Exact")
     plt.xlabel("$d$ (cm)")
     plt.ylabel("Relative Dose (%)")
     plt.title("(SOBP) Spread-out Bragg peak")
     set_lim()
     add_legend()
 
-    return de, bx, wx, sx
+    return depths, bx, wx, sx
     

@@ -4,7 +4,6 @@
             6,
             18
         ],
-        "NumBeams": 10,
         "BeamWidth": 2,
         "PhotonEnergyPlot": 6,
         "Angles": [
@@ -24,7 +23,6 @@
         "Da": 3,
         "Db": 7,
         "D0": 1,
-        "NumBeams": 8,
         "BeamWidth": 2,
         "Angles": [
             0,

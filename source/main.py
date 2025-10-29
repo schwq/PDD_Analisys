@@ -1,3 +1,3 @@
-import analisys_Sim as Analysis
+import analisys as Analysis
 
 Analysis.start()
